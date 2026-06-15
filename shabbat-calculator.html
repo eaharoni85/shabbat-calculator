@@ -374,91 +374,10 @@
       letter-spacing: 0;
     }
 
-    h3 {
-      margin: 18px 0 10px;
-      font-size: 16px;
-      letter-spacing: 0;
-    }
-
-    .rules {
-      display: grid;
-      gap: 12px;
-    }
-
-    .rule-line {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(223, 229, 238, 0.85);
-      color: var(--muted);
-    }
-
-    .rule-line b {
-      color: var(--ink);
-    }
-
-    .exception-form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 18px;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
-    }
-
-    .exception-form label:last-of-type,
-    .exception-form .full {
-      grid-column: 1 / -1;
-    }
-
-    .exception-list {
-      display: grid;
-      gap: 8px;
-      margin-top: 14px;
-    }
-
-    .exception-item {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 8px;
-      align-items: center;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      box-shadow: 0 1px 0 rgba(29, 39, 56, 0.03);
-    }
-
-    .exception-item p {
-      margin: 0;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    .exception-item b {
-      color: var(--ink);
-    }
-
     .empty {
       margin: 0;
       color: var(--muted);
       line-height: 1.5;
-    }
-
-    .holiday-summary {
-      margin-top: 16px;
-      padding: 13px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--soft);
-      color: var(--muted);
-      line-height: 1.55;
-      font-size: 14px;
-    }
-
-    .holiday-summary b {
-      color: var(--ink);
     }
 
     .holiday-list {
@@ -534,8 +453,7 @@
       }
 
       .field-grid,
-      .details,
-      .exception-form {
+      .details {
         grid-template-columns: 1fr;
       }
 
@@ -618,63 +536,6 @@
       <section class="panel" aria-labelledby="settingsTitle">
         <h2 id="settingsTitle">החגים הקרובים</h2>
         <div class="holiday-list" id="holidayList" aria-live="polite"></div>
-
-        <h3>כללי בסיס</h3>
-        <div class="rules">
-          <div class="rule-line">
-            <span>נקודת ייחוס</span>
-            <b>19/06/2026-20/06/2026</b>
-          </div>
-          <div class="rule-line">
-            <span>באותו סוף שבוע</span>
-            <b>עדי</b>
-          </div>
-          <div class="rule-line">
-            <span>סופי שבוע</span>
-            <b>שישי-שבת</b>
-          </div>
-        </div>
-
-        <div class="holiday-summary">
-          <b>חגים אוטומטיים:</b>
-          החישוב מתחיל מתשפ"ו, ובכל שנה עברית החלוקה מתחלפת לפי ההסכם. בחנוכה נשארים זמני השהות הרגילים; במחציות פסח וסוכות סוף שבוע נשאר לפי סדר השבתות.
-        </div>
-
-        <h3>חריגים ידניים</h3>
-        <form class="exception-form" id="exceptionForm">
-          <label>
-            מתאריך
-            <span class="date-control">
-              <input id="exceptionStartText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
-              <button class="date-picker-button" id="exceptionStartPicker" type="button" aria-label="פתח לוח שנה">▦</button>
-              <input id="exceptionStart" type="date" aria-hidden="true" tabindex="-1" required />
-            </span>
-            <span class="date-error" id="exceptionStartError"></span>
-          </label>
-          <label>
-            עד תאריך
-            <span class="date-control">
-              <input id="exceptionEndText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
-              <button class="date-picker-button" id="exceptionEndPicker" type="button" aria-label="פתח לוח שנה">▦</button>
-              <input id="exceptionEnd" type="date" aria-hidden="true" tabindex="-1" required />
-            </span>
-            <span class="date-error" id="exceptionEndError"></span>
-          </label>
-          <label>
-            אצל מי
-            <select id="exceptionOwner">
-              <option value="dad">אלירן</option>
-              <option value="mom">עדי</option>
-            </select>
-          </label>
-          <label>
-            שם החריג
-            <input id="exceptionName" type="text" placeholder="למשל: ראש השנה" required />
-          </label>
-          <button class="primary full" type="submit">הוסף חריג</button>
-        </form>
-
-        <div class="exception-list" id="exceptionList"></div>
       </section>
     </main>
   </div>
@@ -738,18 +599,6 @@
       methodText: document.querySelector("#methodText"),
       weeksText: document.querySelector("#weeksText"),
       nextOwnerText: document.querySelector("#nextOwnerText"),
-      exceptionForm: document.querySelector("#exceptionForm"),
-      exceptionStart: document.querySelector("#exceptionStart"),
-      exceptionStartText: document.querySelector("#exceptionStartText"),
-      exceptionStartPicker: document.querySelector("#exceptionStartPicker"),
-      exceptionStartError: document.querySelector("#exceptionStartError"),
-      exceptionEnd: document.querySelector("#exceptionEnd"),
-      exceptionEndText: document.querySelector("#exceptionEndText"),
-      exceptionEndPicker: document.querySelector("#exceptionEndPicker"),
-      exceptionEndError: document.querySelector("#exceptionEndError"),
-      exceptionOwner: document.querySelector("#exceptionOwner"),
-      exceptionName: document.querySelector("#exceptionName"),
-      exceptionList: document.querySelector("#exceptionList"),
       holidayList: document.querySelector("#holidayList")
     };
 
@@ -770,12 +619,9 @@
       setDateControl("checkDate", today);
       calculate();
       renderHolidayList(today);
-      renderExceptions();
 
       els.calculateBtn.addEventListener("click", calculate);
       setupDateControl("checkDate", calculate);
-      setupDateControl("exceptionStart");
-      setupDateControl("exceptionEnd");
       els.todayBtn.addEventListener("click", () => setDateAndCalculate(today));
       els.nextWeekendBtn.addEventListener("click", () => setDateAndCalculate(getWeekendFriday(today)));
       els.plusWeekBtn.addEventListener("click", () => {
@@ -783,32 +629,6 @@
         if (!current) return;
         current.setDate(current.getDate() + 7);
         setDateAndCalculate(current);
-      });
-
-      els.exceptionForm.addEventListener("submit", event => {
-        event.preventDefault();
-        const start = commitDateControl("exceptionStart");
-        const end = commitDateControl("exceptionEnd");
-        if (!start || !end) return;
-
-        if (end < start) {
-          els.exceptionEnd.setCustomValidity("תאריך הסיום צריך להיות אחרי תאריך ההתחלה");
-          els.exceptionEnd.reportValidity();
-          return;
-        }
-
-        els.exceptionEnd.setCustomValidity("");
-        exceptions.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-          start: els.exceptionStart.value,
-          end: els.exceptionEnd.value,
-          owner: els.exceptionOwner.value,
-          name: els.exceptionName.value.trim()
-        });
-        saveExceptions();
-        resetExceptionForm();
-        renderExceptions();
-        calculate();
       });
     }
 
@@ -1237,53 +1057,12 @@
       return aStart <= bEnd && bStart <= aEnd;
     }
 
-    function renderExceptions() {
-      els.exceptionList.innerHTML = "";
-
-      if (exceptions.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "empty";
-        empty.textContent = "אין חריגים שמורים.";
-        els.exceptionList.append(empty);
-        return;
-      }
-
-      exceptions
-        .slice()
-        .sort((a, b) => parseDate(a.start) - parseDate(b.start))
-        .forEach(item => {
-          const row = document.createElement("div");
-          row.className = "exception-item";
-
-          const text = document.createElement("p");
-          text.innerHTML = `<b>${escapeHtml(item.name)}</b><br>${formatDate(parseDate(item.start))} - ${formatDate(parseDate(item.end))} · ${owners[item.owner]}`;
-
-          const button = document.createElement("button");
-          button.className = "danger";
-          button.type = "button";
-          button.textContent = "מחק";
-          button.addEventListener("click", () => {
-            exceptions = exceptions.filter(exception => exception.id !== item.id);
-            saveExceptions();
-            renderExceptions();
-            calculate();
-          });
-
-          row.append(text, button);
-          els.exceptionList.append(row);
-        });
-    }
-
     function loadExceptions() {
       try {
         return JSON.parse(localStorage.getItem("shabbatCalculatorExceptions") || "[]");
       } catch {
         return [];
       }
-    }
-
-    function saveExceptions() {
-      localStorage.setItem("shabbatCalculatorExceptions", JSON.stringify(exceptions));
     }
 
     function setupDateControl(name, onCommit) {
@@ -1343,15 +1122,6 @@
 
       setDateControl(name, parsedDate);
       return parsedDate;
-    }
-
-    function resetExceptionForm() {
-      els.exceptionForm.reset();
-      ["exceptionStart", "exceptionEnd"].forEach(name => {
-        els[name].value = "";
-        els[`${name}Text`].value = "";
-        clearDateError(name);
-      });
     }
 
     function clearDateError(name) {
