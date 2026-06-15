@@ -237,6 +237,70 @@
       font-weight: 700;
     }
 
+    .week-view {
+      display: grid;
+      gap: 10px;
+    }
+
+    .week-day {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .week-day.selected {
+      border-color: rgba(29, 95, 149, 0.55);
+      background: #eef6fc;
+    }
+
+    .week-day.holiday {
+      border-color: rgba(162, 107, 0, 0.42);
+      background: #fff8e8;
+    }
+
+    .week-name {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .week-meta {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .week-date,
+    .week-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .week-owner {
+      justify-self: end;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: var(--soft);
+      color: var(--ink);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .week-owner.mom {
+      background: rgba(181, 72, 95, 0.12);
+      color: var(--rose);
+    }
+
+    .week-owner.dad {
+      background: rgba(47, 125, 88, 0.12);
+      color: var(--green);
+    }
+
     .details {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -433,6 +497,14 @@
         grid-template-columns: 1fr;
       }
 
+      .week-day {
+        grid-template-columns: 1fr;
+      }
+
+      .week-owner {
+        justify-self: start;
+      }
+
       .holiday-item {
         grid-template-columns: 1fr;
       }
@@ -448,14 +520,14 @@
     <header>
       <div>
         <h1>מחשבון שבתות - משפחת אהרוני</h1>
-        <p class="subtitle">חישוב מהיר לפי הסדר הקבוע: 19/06/2026-20/06/2026 אצל עדי, סוף השבוע שאחריו אצל אלירן, ואז לסירוגין.</p>
+        <p class="subtitle">בחר תאריך וקבל את כל השבוע: ימים קבועים, חמישי מתחלף, שישי-שבת לסירוגין, וחגים שגוברים על הימים הרגילים.</p>
       </div>
       <div class="today" id="todayLabel"></div>
     </header>
 
     <main>
       <section class="calculator" aria-labelledby="calcTitle">
-        <h2 id="calcTitle">בדיקת תאריך</h2>
+        <h2 id="calcTitle">בדיקת שבוע</h2>
         <div class="field-grid">
           <label>
             תאריך לבדיקה
@@ -471,28 +543,30 @@
 
         <div class="quick-actions">
           <button id="todayBtn">היום</button>
-          <button id="nextWeekendBtn">סופ"ש קרוב</button>
+          <button id="nextWeekendBtn">שבוע הסופ"ש הקרוב</button>
           <button id="plusWeekBtn">שבוע קדימה</button>
         </div>
 
         <div class="result" aria-live="polite">
           <div class="answer" id="answerBox">
             <span class="small" id="answerContext"></span>
-            <strong id="ownerText"></strong>
-            <span class="dates" id="weekendDates"></span>
+            <strong id="weekTitle"></strong>
+            <span class="dates" id="weekRange"></span>
           </div>
+
+          <div class="week-view" id="weekView"></div>
 
           <div class="details">
             <div class="metric">
-              <span>שיטת חישוב</span>
+              <span>שישי-שבת</span>
               <b id="methodText"></b>
             </div>
             <div class="metric">
-              <span>מרחק מנקודת הייחוס</span>
+              <span>חמישי</span>
               <b id="weeksText"></b>
             </div>
             <div class="metric">
-              <span>סוף השבוע הבא</span>
+              <span>הערת חגים</span>
               <b id="nextOwnerText"></b>
             </div>
           </div>
@@ -616,8 +690,9 @@
       plusWeekBtn: document.querySelector("#plusWeekBtn"),
       answerBox: document.querySelector("#answerBox"),
       answerContext: document.querySelector("#answerContext"),
-      ownerText: document.querySelector("#ownerText"),
-      weekendDates: document.querySelector("#weekendDates"),
+      weekTitle: document.querySelector("#weekTitle"),
+      weekRange: document.querySelector("#weekRange"),
+      weekView: document.querySelector("#weekView"),
       methodText: document.querySelector("#methodText"),
       weeksText: document.querySelector("#weeksText"),
       nextOwnerText: document.querySelector("#nextOwnerText"),
@@ -699,44 +774,136 @@
       const selected = commitDateControl("checkDate");
       if (!selected) return;
 
-      const weekendFriday = getWeekendFriday(selected);
-      const weekendSaturday = addDays(weekendFriday, 1);
-      const weeksFromBase = Math.round((weekendFriday - baseWeekend) / (7 * 24 * 60 * 60 * 1000));
-      const regularOwner = modulo(weeksFromBase, 2) === 0 ? "mom" : "dad";
-      const matchedException = findException(weekendFriday, weekendSaturday, selected);
-      const selectedHoliday = getHolidayForDate(selected);
-      const weekendHoliday = getHolidayForRange(weekendFriday, weekendSaturday);
-      const activeHoliday = selectedHoliday || weekendHoliday;
-      const useRegularWeekend = activeHoliday
-        && activeHoliday.keepWeekendRegular
-        && (!selectedHoliday || selectedIsWeekend(selected))
-        && rangesOverlap(weekendFriday, weekendSaturday, activeHoliday.start, activeHoliday.end);
-      const finalOwner = matchedException
-        ? matchedException.owner
-        : activeHoliday && !useRegularWeekend
-          ? activeHoliday.owner
-          : regularOwner;
-      const nextWeekendOwner = getRegularOwner(addDays(weekendFriday, 7));
-      const displayStart = activeHoliday && !useRegularWeekend ? activeHoliday.start : weekendFriday;
-      const displayEnd = activeHoliday && !useRegularWeekend ? activeHoliday.end : weekendSaturday;
+      const week = buildWeek(selected);
+      const selectedDay = week.days.find(day => sameDate(day.date, selected));
+      const weekendOwner = getRegularOwner(week.friday);
+      const thursdayOwner = oppositeOwner(weekendOwner);
+      const hasHolidayOverride = week.days.some(day => day.holiday && !day.useRegularWeekend);
 
-      els.answerBox.className = `answer ${finalOwner === "mom" ? "mom" : ""} ${matchedException || activeHoliday ? "exception" : ""}`;
-      els.answerContext.textContent = getResultContext(selected, matchedException, activeHoliday, useRegularWeekend);
-      els.ownerText.textContent = owners[finalOwner];
-      els.weekendDates.textContent = `${formatDate(displayStart)} - ${formatDate(displayEnd)}`;
-      els.methodText.textContent = matchedException
-        ? "חריג ידני"
-        : activeHoliday
-          ? useRegularWeekend ? "חג + שבת רגילה" : "חג לפי הסכם"
-          : "סדר קבוע";
-      els.weeksText.textContent = weeksFromBase === 0 ? "שבוע הייחוס" : `${Math.abs(weeksFromBase)} שבועות ${weeksFromBase > 0 ? "אחרי" : "לפני"}`;
-      els.nextOwnerText.textContent = owners[nextWeekendOwner];
+      els.answerBox.className = `answer ${selectedDay.owner === "mom" ? "mom" : ""} ${selectedDay.holiday || selectedDay.exception ? "exception" : ""}`;
+      els.answerContext.textContent = selectedDay.holiday && !selectedDay.useRegularWeekend
+        ? "היום שנבחר מושפע מחג - חג גובר על הימים הרגילים"
+        : selectedDay.exception
+          ? "היום שנבחר לפי חריג ידני"
+          : "השבוע של התאריך שנבחר";
+      els.weekTitle.textContent = `שבוע ${formatDate(week.start)} - ${formatDate(week.end)}`;
+      els.weekRange.textContent = `ביום שנבחר: ${owners[selectedDay.owner]}`;
+      els.methodText.textContent = owners[weekendOwner];
+      els.weeksText.textContent = owners[thursdayOwner];
+      els.nextOwnerText.textContent = hasHolidayOverride ? "חג גובר" : "אין חג השבוע";
+      renderWeekView(week, selected);
       renderHolidayList(selected);
+    }
+
+    function buildWeek(selected) {
+      const start = getWeekSunday(selected);
+      const friday = addDays(start, 5);
+      const weekendOwner = getRegularOwner(friday);
+      const days = [];
+
+      for (let index = 0; index < 7; index += 1) {
+        const date = addDays(start, index);
+        days.push(getDayCustody(date, start, weekendOwner));
+      }
+
+      return {
+        start,
+        end: addDays(start, 6),
+        friday,
+        days
+      };
+    }
+
+    function getDayCustody(date, weekStart, weekendOwner) {
+      const day = date.getDay();
+      const regularOwner = getRegularDayOwner(day, weekendOwner);
+      const exception = findExceptionForDate(date);
+      const holiday = getHolidayForDate(date);
+      const useRegularWeekend = holiday
+        && holiday.keepWeekendRegular
+        && selectedIsWeekend(date);
+      const owner = exception
+        ? exception.owner
+        : holiday && !useRegularWeekend
+          ? holiday.owner
+          : regularOwner;
+
+      return {
+        date,
+        dayName: getShortDayName(date),
+        owner,
+        regularOwner,
+        exception,
+        holiday,
+        useRegularWeekend
+      };
+    }
+
+    function getRegularDayOwner(day, weekendOwner) {
+      if (day === 0 || day === 2) return "mom";
+      if (day === 1 || day === 3) return "dad";
+      if (day === 4) return oppositeOwner(weekendOwner);
+      return weekendOwner;
+    }
+
+    function renderWeekView(week, selected) {
+      els.weekView.innerHTML = "";
+
+      week.days.forEach(day => {
+        const item = document.createElement("div");
+        item.className = `week-day ${sameDate(day.date, selected) ? "selected" : ""} ${day.holiday && !day.useRegularWeekend ? "holiday" : ""}`;
+
+        const name = document.createElement("div");
+        name.className = "week-name";
+        name.textContent = day.dayName;
+
+        const meta = document.createElement("div");
+        meta.className = "week-meta";
+
+        const date = document.createElement("div");
+        date.className = "week-date";
+        date.textContent = formatDate(day.date);
+        meta.append(date);
+
+        const note = getDayNote(day);
+        if (note) {
+          const noteEl = document.createElement("div");
+          noteEl.className = "week-note";
+          noteEl.textContent = note;
+          meta.append(noteEl);
+        }
+
+        const owner = document.createElement("div");
+        owner.className = `week-owner ${day.owner}`;
+        owner.textContent = owners[day.owner];
+
+        item.append(name, meta, owner);
+        els.weekView.append(item);
+      });
+    }
+
+    function getDayNote(day) {
+      if (day.exception) return `חריג ידני: ${day.exception.name}`;
+      if (day.holiday && day.useRegularWeekend) return `${day.holiday.name} - סוף שבוע נשאר לפי הסדר הקבוע`;
+      if (day.holiday) return `${day.holiday.name} - חג גובר על הימים הרגילים`;
+      if (day.date.getDay() === 4) return "חמישי מתחלף הפוך משישי-שבת";
+      if (day.date.getDay() === 5 || day.date.getDay() === 6) return "שישי-שבת לפי הסדר המתחלף";
+      return "";
     }
 
     function getRegularOwner(friday) {
       const weeks = Math.round((friday - baseWeekend) / (7 * 24 * 60 * 60 * 1000));
       return modulo(weeks, 2) === 0 ? "mom" : "dad";
+    }
+
+    function oppositeOwner(owner) {
+      return owner === "mom" ? "dad" : "mom";
+    }
+
+    function getWeekSunday(date) {
+      const sunday = stripTime(new Date(date));
+      sunday.setDate(sunday.getDate() - sunday.getDay());
+      return sunday;
     }
 
     function getWeekendFriday(date) {
@@ -756,6 +923,16 @@
 
     function selectedIsWeekend(date) {
       return date.getDay() === 5 || date.getDay() === 6;
+    }
+
+    function sameDate(first, second) {
+      return first.getFullYear() === second.getFullYear()
+        && first.getMonth() === second.getMonth()
+        && first.getDate() === second.getDate();
+    }
+
+    function getShortDayName(date) {
+      return ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"][date.getDay()];
     }
 
     function getResultContext(selected, matchedException, activeHoliday, useRegularWeekend) {
@@ -1003,6 +1180,14 @@
         const start = parseDate(item.start);
         const end = parseDate(item.end);
         return rangesOverlap(friday, saturday, start, end) || (selected >= start && selected <= end);
+      });
+    }
+
+    function findExceptionForDate(date) {
+      return exceptions.find(item => {
+        const start = parseDate(item.start);
+        const end = parseDate(item.end);
+        return date >= start && date <= end;
       });
     }
 
