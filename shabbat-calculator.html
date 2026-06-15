@@ -304,6 +304,19 @@
       line-height: 1.5;
     }
 
+    .holiday-summary {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .holiday-summary b {
+      color: var(--ink);
+    }
+
     @media (max-width: 820px) {
       header,
       main {
@@ -391,6 +404,11 @@
           </div>
         </div>
 
+        <div class="holiday-summary">
+          <b>חגים אוטומטיים:</b>
+          החישוב מתחיל מתשפ"ו, ובכל שנה עברית החלוקה מתחלפת לפי ההסכם. בחנוכה נשארים זמני השהות הרגילים; במחציות פסח וסוכות סוף שבוע נשאר לפי סדר השבתות.
+        </div>
+
         <form class="exception-form" id="exceptionForm">
           <label>
             מתאריך
@@ -424,6 +442,40 @@
     const owners = {
       dad: "אצלי",
       mom: "עדי"
+    };
+
+    const baseHebrewYear = 5786;
+    const hebrewFormatter = new Intl.DateTimeFormat("en-u-ca-hebrew", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+
+    const holidayPatterns = {
+      0: {
+        roshHashana: "dad",
+        yomKippur: "mom",
+        sukkotA: "dad",
+        sukkotB: "mom",
+        purim1: "mom",
+        purim2: "dad",
+        pesachA: "mom",
+        pesachB: "dad",
+        yomHaatzmaut: "dad",
+        shavuot: "mom"
+      },
+      1: {
+        roshHashana: "mom",
+        yomKippur: "dad",
+        sukkotA: "mom",
+        sukkotB: "dad",
+        purim1: "mom",
+        purim2: "dad",
+        pesachA: "dad",
+        pesachB: "mom",
+        yomHaatzmaut: "mom",
+        shavuot: "dad"
+      }
     };
 
     const els = {
@@ -511,16 +563,31 @@
       const weeksFromBase = Math.round((weekendFriday - baseWeekend) / (7 * 24 * 60 * 60 * 1000));
       const regularOwner = modulo(weeksFromBase, 2) === 0 ? "mom" : "dad";
       const matchedException = findException(weekendFriday, weekendSaturday, selected);
-      const finalOwner = matchedException ? matchedException.owner : regularOwner;
+      const selectedHoliday = getHolidayForDate(selected);
+      const weekendHoliday = getHolidayForRange(weekendFriday, weekendSaturday);
+      const activeHoliday = selectedHoliday || weekendHoliday;
+      const useRegularWeekend = activeHoliday
+        && activeHoliday.keepWeekendRegular
+        && (!selectedHoliday || selectedIsWeekend(selected))
+        && rangesOverlap(weekendFriday, weekendSaturday, activeHoliday.start, activeHoliday.end);
+      const finalOwner = matchedException
+        ? matchedException.owner
+        : activeHoliday && !useRegularWeekend
+          ? activeHoliday.owner
+          : regularOwner;
       const nextWeekendOwner = getRegularOwner(addDays(weekendFriday, 7));
+      const displayStart = activeHoliday && !useRegularWeekend ? activeHoliday.start : weekendFriday;
+      const displayEnd = activeHoliday && !useRegularWeekend ? activeHoliday.end : weekendSaturday;
 
-      els.answerBox.className = `answer ${finalOwner === "mom" ? "mom" : ""} ${matchedException ? "exception" : ""}`;
-      els.answerContext.textContent = matchedException
-        ? `לפי חריג: ${matchedException.name}`
-        : selectedIsWeekend(selected) ? "התאריך בתוך סוף השבוע הזה" : "סוף השבוע הקרוב לתאריך";
+      els.answerBox.className = `answer ${finalOwner === "mom" ? "mom" : ""} ${matchedException || activeHoliday ? "exception" : ""}`;
+      els.answerContext.textContent = getResultContext(selected, matchedException, activeHoliday, useRegularWeekend);
       els.ownerText.textContent = owners[finalOwner];
-      els.weekendDates.textContent = `${formatDate(weekendFriday)} - ${formatDate(weekendSaturday)}`;
-      els.methodText.textContent = matchedException ? "חריג / חג" : "סדר קבוע";
+      els.weekendDates.textContent = `${formatDate(displayStart)} - ${formatDate(displayEnd)}`;
+      els.methodText.textContent = matchedException
+        ? "חריג ידני"
+        : activeHoliday
+          ? useRegularWeekend ? "חג + שבת רגילה" : "חג לפי הסכם"
+          : "סדר קבוע";
       els.weeksText.textContent = weeksFromBase === 0 ? "שבוע הייחוס" : `${Math.abs(weeksFromBase)} שבועות ${weeksFromBase > 0 ? "אחרי" : "לפני"}`;
       els.nextOwnerText.textContent = owners[nextWeekendOwner];
     }
@@ -547,6 +614,168 @@
 
     function selectedIsWeekend(date) {
       return date.getDay() === 5 || date.getDay() === 6;
+    }
+
+    function getResultContext(selected, matchedException, activeHoliday, useRegularWeekend) {
+      if (matchedException) return `לפי חריג: ${matchedException.name}`;
+      if (activeHoliday && useRegularWeekend) return `${activeHoliday.name} - סוף שבוע נשאר לפי הסדר הקבוע`;
+      if (activeHoliday) return `${activeHoliday.name} (${activeHoliday.hebrewYearLabel})`;
+      return selectedIsWeekend(selected) ? "התאריך בתוך סוף השבוע הזה" : "סוף השבוע הקרוב לתאריך";
+    }
+
+    function getHolidayForRange(start, end) {
+      for (let date = stripTime(new Date(start)); date <= end; date = addDays(date, 1)) {
+        const holiday = getHolidayForDate(date);
+        if (holiday) return holiday;
+      }
+
+      return null;
+    }
+
+    function getHolidayForDate(date) {
+      const holiday = getHolidayRule(date);
+      if (!holiday) return null;
+
+      const range = getHolidayRange(date, holiday.id);
+      return {
+        ...holiday,
+        start: range.start,
+        end: range.end
+      };
+    }
+
+    function getHolidayRange(date, holidayId) {
+      let start = stripTime(new Date(date));
+      let end = stripTime(new Date(date));
+
+      while (sameHoliday(addDays(start, -1), holidayId)) {
+        start = addDays(start, -1);
+      }
+
+      while (sameHoliday(addDays(end, 1), holidayId)) {
+        end = addDays(end, 1);
+      }
+
+      return { start, end };
+    }
+
+    function sameHoliday(date, holidayId) {
+      const holiday = getHolidayRule(date);
+      return Boolean(holiday && holiday.id === holidayId);
+    }
+
+    function getHolidayRule(date) {
+      const hebrew = getHebrewDate(date);
+      const pattern = holidayPatterns[modulo(hebrew.year - baseHebrewYear, 2)];
+      const hebrewYearLabel = getHebrewYearLabel(hebrew.year);
+      const createHoliday = (id, name, owner, keepWeekendRegular = false) => ({
+        id,
+        name,
+        owner,
+        keepWeekendRegular,
+        hebrewYear: hebrew.year,
+        hebrewYearLabel
+      });
+
+      if (hebrew.month === "Tishri" && hebrew.day >= 1 && hebrew.day <= 2) {
+        return createHoliday("roshHashana", "ראש השנה", pattern.roshHashana);
+      }
+
+      if (hebrew.month === "Tishri" && hebrew.day === 10) {
+        return createHoliday("yomKippur", "יום כיפור", pattern.yomKippur);
+      }
+
+      if (hebrew.month === "Tishri" && hebrew.day >= 14 && hebrew.day <= 18) {
+        return createHoliday("sukkotA", "סוכות - חלק א׳", pattern.sukkotA, true);
+      }
+
+      if (hebrew.month === "Tishri" && hebrew.day >= 19 && hebrew.day <= 22) {
+        return createHoliday("sukkotB", "סוכות - חלק ב׳", pattern.sukkotB, true);
+      }
+
+      if (isHanukkah(date)) {
+        return createHoliday("hanukkah", "חנוכה - זמני שהות רגילים", getRegularOwner(getWeekendFriday(date)), true);
+      }
+
+      if (isPurimMonth(hebrew.month) && hebrew.day === 14) {
+        return createHoliday("purim1", "פורים - יום 1", pattern.purim1);
+      }
+
+      if (isPurimMonth(hebrew.month) && hebrew.day === 15) {
+        return createHoliday("purim2", "פורים - יום 2", pattern.purim2);
+      }
+
+      if (hebrew.month === "Nisan" && hebrew.day >= 14 && hebrew.day <= 17) {
+        return createHoliday("pesachA", "פסח - מחצית ראשונה", pattern.pesachA, true);
+      }
+
+      if (hebrew.month === "Nisan" && hebrew.day >= 18 && hebrew.day <= 21) {
+        return createHoliday("pesachB", "פסח - מחצית שנייה", pattern.pesachB, true);
+      }
+
+      if (isYomHaatzmaut(date, hebrew)) {
+        return createHoliday("yomHaatzmaut", "יום העצמאות", pattern.yomHaatzmaut);
+      }
+
+      if (hebrew.month === "Sivan" && hebrew.day >= 5 && hebrew.day <= 6) {
+        return createHoliday("shavuot", "שבועות", pattern.shavuot);
+      }
+
+      return null;
+    }
+
+    function getHebrewDate(date) {
+      const parts = hebrewFormatter.formatToParts(date);
+      return {
+        day: Number(parts.find(part => part.type === "day").value),
+        month: parts.find(part => part.type === "month").value,
+        year: Number(parts.find(part => part.type === "year").value)
+      };
+    }
+
+    function isPurimMonth(month) {
+      return month === "Adar" || month === "Adar II";
+    }
+
+    function isHanukkah(date) {
+      for (let daysBack = 0; daysBack < 8; daysBack += 1) {
+        const hebrew = getHebrewDate(addDays(date, -daysBack));
+        if (hebrew.month === "Kislev" && hebrew.day === 25) return true;
+      }
+
+      return false;
+    }
+
+    function isYomHaatzmaut(date, hebrew) {
+      if (hebrew.month !== "Iyar" || hebrew.day < 3 || hebrew.day > 6) return false;
+
+      const fiveIyar = addDays(date, 5 - hebrew.day);
+      const fiveIyarDay = fiveIyar.getDay();
+      let observedDay = 5;
+
+      if (fiveIyarDay === 5) observedDay = 3;
+      if (fiveIyarDay === 6) observedDay = 4;
+      if (fiveIyarDay === 1) observedDay = 6;
+
+      return hebrew.day === observedDay;
+    }
+
+    function getHebrewYearLabel(year) {
+      const knownYears = {
+        5786: "תשפ״ו",
+        5787: "תשפ״ז",
+        5788: "תשפ״ח",
+        5789: "תשפ״ט",
+        5790: "תש״ץ",
+        5791: "תשצ״א",
+        5792: "תשצ״ב",
+        5793: "תשצ״ג",
+        5794: "תשצ״ד",
+        5795: "תשצ״ה",
+        5796: "תשצ״ו"
+      };
+
+      return knownYears[year] || `שנה עברית ${year}`;
     }
 
     function findException(friday, saturday, selected) {
