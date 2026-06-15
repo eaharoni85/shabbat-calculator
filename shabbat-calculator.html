@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>מחשבון שבתות</title>
+      <title>מחשבון שבתות</title>
   <style>
     :root {
       color-scheme: light;
@@ -328,7 +328,7 @@
     <header>
       <div>
         <h1>מחשבון שבתות</h1>
-        <p class="subtitle">חישוב מהיר לפי הסדר הקבוע: 19-20/06/2026 אצל עדי, סוף השבוע שאחריו אצלך, ואז לסירוגין.</p>
+        <p class="subtitle">חישוב מהיר לפי הסדר הקבוע: 19/06/2026-20/06/2026 אצל עדי, סוף השבוע שאחריו אצלך, ואז לסירוגין.</p>
       </div>
       <div class="today" id="todayLabel"></div>
     </header>
@@ -379,7 +379,7 @@
         <div class="rules">
           <div class="rule-line">
             <span>נקודת ייחוס</span>
-            <b>19-20/06/2026</b>
+            <b>19/06/2026-20/06/2026</b>
           </div>
           <div class="rule-line">
             <span>באותו סוף שבוע</span>
@@ -448,14 +448,8 @@
       exceptionList: document.querySelector("#exceptionList")
     };
 
-    const formatter = new Intl.DateTimeFormat("he-IL", {
+    const weekdayFormatter = new Intl.DateTimeFormat("he-IL", {
       weekday: "long",
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric"
-    });
-
-    const compactFormatter = new Intl.DateTimeFormat("he-IL", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric"
@@ -467,7 +461,7 @@
 
     function initialize() {
       const today = stripTime(new Date());
-      els.todayLabel.textContent = `היום: ${formatter.format(today)}`;
+      els.todayLabel.textContent = `היום: ${formatWeekdayDate(today)}`;
       els.checkDate.value = toInputDate(today);
       calculate();
       renderExceptions();
@@ -525,7 +519,7 @@
         ? `לפי חריג: ${matchedException.name}`
         : selectedIsWeekend(selected) ? "התאריך בתוך סוף השבוע הזה" : "סוף השבוע הקרוב לתאריך";
       els.ownerText.textContent = owners[finalOwner];
-      els.weekendDates.textContent = `${compactFormatter.format(weekendFriday)} - ${compactFormatter.format(weekendSaturday)}`;
+      els.weekendDates.textContent = `${formatDate(weekendFriday)} - ${formatDate(weekendSaturday)}`;
       els.methodText.textContent = matchedException ? "חריג / חג" : "סדר קבוע";
       els.weeksText.textContent = weeksFromBase === 0 ? "שבוע הייחוס" : `${Math.abs(weeksFromBase)} שבועות ${weeksFromBase > 0 ? "אחרי" : "לפני"}`;
       els.nextOwnerText.textContent = owners[nextWeekendOwner];
@@ -586,7 +580,7 @@
           row.className = "exception-item";
 
           const text = document.createElement("p");
-          text.innerHTML = `<b>${escapeHtml(item.name)}</b><br>${compactFormatter.format(parseDate(item.start))} - ${compactFormatter.format(parseDate(item.end))} · ${owners[item.owner]}`;
+          text.innerHTML = `<b>${escapeHtml(item.name)}</b><br>${formatDate(parseDate(item.start))} - ${formatDate(parseDate(item.end))} · ${owners[item.owner]}`;
 
           const button = document.createElement("button");
           button.className = "danger";
@@ -627,6 +621,17 @@
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
+    }
+
+    function formatDate(date) {
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      return `${day}/${month}/${date.getFullYear()}`;
+    }
+
+    function formatWeekdayDate(date) {
+      const weekday = weekdayFormatter.formatToParts(date).find(part => part.type === "weekday").value;
+      return `${weekday}, ${formatDate(date)}`;
     }
 
     function addDays(date, days) {
