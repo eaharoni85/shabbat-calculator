@@ -130,6 +130,40 @@
       box-shadow: 0 0 0 3px rgba(29, 95, 149, 0.15);
     }
 
+    .date-control {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 48px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .date-control input[type="date"] {
+      position: absolute;
+      inset: auto 0 0 auto;
+      width: 48px;
+      height: 48px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .date-picker-button {
+      width: 48px;
+      min-width: 48px;
+      height: 48px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .date-error {
+      min-height: 18px;
+      color: var(--rose);
+      font-size: 12px;
+    }
+
     .quick-actions {
       display: flex;
       gap: 8px;
@@ -352,7 +386,12 @@
         <div class="field-grid">
           <label>
             תאריך לבדיקה
-            <input id="checkDate" type="date" />
+            <span class="date-control">
+              <input id="checkDateText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
+              <button class="date-picker-button" id="checkDatePicker" type="button" aria-label="פתח לוח שנה">▦</button>
+              <input id="checkDate" type="date" aria-hidden="true" tabindex="-1" />
+            </span>
+            <span class="date-error" id="checkDateError"></span>
           </label>
           <button class="primary" id="calculateBtn">חשב</button>
         </div>
@@ -412,11 +451,21 @@
         <form class="exception-form" id="exceptionForm">
           <label>
             מתאריך
-            <input id="exceptionStart" type="date" required />
+            <span class="date-control">
+              <input id="exceptionStartText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
+              <button class="date-picker-button" id="exceptionStartPicker" type="button" aria-label="פתח לוח שנה">▦</button>
+              <input id="exceptionStart" type="date" aria-hidden="true" tabindex="-1" required />
+            </span>
+            <span class="date-error" id="exceptionStartError"></span>
           </label>
           <label>
             עד תאריך
-            <input id="exceptionEnd" type="date" required />
+            <span class="date-control">
+              <input id="exceptionEndText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
+              <button class="date-picker-button" id="exceptionEndPicker" type="button" aria-label="פתח לוח שנה">▦</button>
+              <input id="exceptionEnd" type="date" aria-hidden="true" tabindex="-1" required />
+            </span>
+            <span class="date-error" id="exceptionEndError"></span>
           </label>
           <label>
             אצל מי
@@ -481,6 +530,9 @@
     const els = {
       todayLabel: document.querySelector("#todayLabel"),
       checkDate: document.querySelector("#checkDate"),
+      checkDateText: document.querySelector("#checkDateText"),
+      checkDatePicker: document.querySelector("#checkDatePicker"),
+      checkDateError: document.querySelector("#checkDateError"),
       calculateBtn: document.querySelector("#calculateBtn"),
       todayBtn: document.querySelector("#todayBtn"),
       nextWeekendBtn: document.querySelector("#nextWeekendBtn"),
@@ -494,7 +546,13 @@
       nextOwnerText: document.querySelector("#nextOwnerText"),
       exceptionForm: document.querySelector("#exceptionForm"),
       exceptionStart: document.querySelector("#exceptionStart"),
+      exceptionStartText: document.querySelector("#exceptionStartText"),
+      exceptionStartPicker: document.querySelector("#exceptionStartPicker"),
+      exceptionStartError: document.querySelector("#exceptionStartError"),
       exceptionEnd: document.querySelector("#exceptionEnd"),
+      exceptionEndText: document.querySelector("#exceptionEndText"),
+      exceptionEndPicker: document.querySelector("#exceptionEndPicker"),
+      exceptionEndError: document.querySelector("#exceptionEndError"),
       exceptionOwner: document.querySelector("#exceptionOwner"),
       exceptionName: document.querySelector("#exceptionName"),
       exceptionList: document.querySelector("#exceptionList")
@@ -514,24 +572,28 @@
     function initialize() {
       const today = stripTime(new Date());
       els.todayLabel.textContent = `היום: ${formatWeekdayDate(today)}`;
-      els.checkDate.value = toInputDate(today);
+      setDateControl("checkDate", today);
       calculate();
       renderExceptions();
 
       els.calculateBtn.addEventListener("click", calculate);
-      els.checkDate.addEventListener("change", calculate);
+      setupDateControl("checkDate", calculate);
+      setupDateControl("exceptionStart");
+      setupDateControl("exceptionEnd");
       els.todayBtn.addEventListener("click", () => setDateAndCalculate(today));
       els.nextWeekendBtn.addEventListener("click", () => setDateAndCalculate(getWeekendFriday(today)));
       els.plusWeekBtn.addEventListener("click", () => {
-        const current = parseDate(els.checkDate.value);
+        const current = commitDateControl("checkDate");
+        if (!current) return;
         current.setDate(current.getDate() + 7);
         setDateAndCalculate(current);
       });
 
       els.exceptionForm.addEventListener("submit", event => {
         event.preventDefault();
-        const start = parseDate(els.exceptionStart.value);
-        const end = parseDate(els.exceptionEnd.value);
+        const start = commitDateControl("exceptionStart");
+        const end = commitDateControl("exceptionEnd");
+        if (!start || !end) return;
 
         if (end < start) {
           els.exceptionEnd.setCustomValidity("תאריך הסיום צריך להיות אחרי תאריך ההתחלה");
@@ -548,14 +610,14 @@
           name: els.exceptionName.value.trim()
         });
         saveExceptions();
-        els.exceptionForm.reset();
+        resetExceptionForm();
         renderExceptions();
         calculate();
       });
     }
 
     function calculate() {
-      const selected = parseDate(els.checkDate.value);
+      const selected = commitDateControl("checkDate");
       if (!selected) return;
 
       const weekendFriday = getWeekendFriday(selected);
@@ -839,11 +901,112 @@
       localStorage.setItem("shabbatCalculatorExceptions", JSON.stringify(exceptions));
     }
 
+    function setupDateControl(name, onCommit) {
+      const hiddenInput = els[name];
+      const textInput = els[`${name}Text`];
+      const pickerButton = els[`${name}Picker`];
+
+      hiddenInput.addEventListener("change", () => {
+        const date = parseDate(hiddenInput.value);
+        if (date) {
+          setDateControl(name, date);
+          if (onCommit) onCommit();
+        }
+      });
+
+      textInput.addEventListener("input", () => {
+        textInput.value = formatDateTyping(textInput.value);
+        clearDateError(name);
+      });
+
+      textInput.addEventListener("blur", () => {
+        const date = commitDateControl(name);
+        if (date && onCommit) onCommit();
+      });
+
+      textInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const date = commitDateControl(name);
+          if (date && onCommit) onCommit();
+        }
+      });
+
+      pickerButton.addEventListener("click", () => {
+        if (hiddenInput.showPicker) {
+          hiddenInput.showPicker();
+        } else {
+          hiddenInput.click();
+        }
+      });
+    }
+
+    function setDateControl(name, date) {
+      els[name].value = toInputDate(date);
+      els[`${name}Text`].value = formatDate(date);
+      clearDateError(name);
+    }
+
+    function commitDateControl(name) {
+      const textInput = els[`${name}Text`];
+      const parsedDate = parseDisplayDate(textInput.value);
+
+      if (!parsedDate) {
+        setDateError(name, "יש להזין תאריך בפורמט DD/MM/YYYY");
+        return null;
+      }
+
+      setDateControl(name, parsedDate);
+      return parsedDate;
+    }
+
+    function resetExceptionForm() {
+      els.exceptionForm.reset();
+      ["exceptionStart", "exceptionEnd"].forEach(name => {
+        els[name].value = "";
+        els[`${name}Text`].value = "";
+        clearDateError(name);
+      });
+    }
+
+    function clearDateError(name) {
+      els[`${name}Error`].textContent = "";
+      els[`${name}Text`].setAttribute("aria-invalid", "false");
+    }
+
+    function setDateError(name, message) {
+      els[`${name}Error`].textContent = message;
+      els[`${name}Text`].setAttribute("aria-invalid", "true");
+    }
+
     function parseDate(value) {
       if (!value) return null;
       const [year, month, day] = value.split("-").map(Number);
       return new Date(year, month - 1, day);
     }
+
+    function parseDisplayDate(value) {
+      const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!match) return null;
+
+      const day = Number(match[1]);
+      const month = Number(match[2]);
+      const year = Number(match[3]);
+      const date = new Date(year, month - 1, day);
+
+      if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null;
+      }
+
+      return date;
+    }
+
+    function formatDateTyping(value) {
+      const digits = value.replace(/\D/g, "").slice(0, 8);
+      const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
+      return parts.join("/");
+    }
+
 
     function toInputDate(date) {
       const year = date.getFullYear();
@@ -878,7 +1041,7 @@
     }
 
     function setDateAndCalculate(date) {
-      els.checkDate.value = toInputDate(date);
+      setDateControl("checkDate", date);
       calculate();
     }
 
