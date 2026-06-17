@@ -149,12 +149,7 @@
     }
 
     .date-control input[type="date"] {
-      position: absolute;
-      inset: auto 0 0 auto;
-      width: 48px;
-      height: 48px;
-      opacity: 0;
-      pointer-events: none;
+      display: none;
     }
 
     .date-picker-button {
@@ -167,6 +162,85 @@
       font-size: 20px;
       line-height: 1;
       background: var(--soft);
+    }
+
+    .date-calendar {
+      position: absolute;
+      z-index: 20;
+      inset-block-start: calc(100% + 8px);
+      inset-inline-end: 0;
+      width: min(320px, calc(100vw - 48px));
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .date-calendar[hidden] {
+      display: none;
+    }
+
+    .date-calendar-header {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) 40px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .date-calendar-title {
+      text-align: center;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .date-calendar-nav,
+    .date-calendar-day {
+      min-height: 38px;
+      padding: 0;
+    }
+
+    .date-calendar-weekdays,
+    .date-calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .date-calendar-weekday {
+      min-height: 26px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .date-calendar-day {
+      border-color: transparent;
+      background: transparent;
+      font-weight: 700;
+    }
+
+    .date-calendar-day:hover {
+      background: var(--blue-soft);
+      transform: none;
+    }
+
+    .date-calendar-day.outside {
+      color: #a5afbd;
+      font-weight: 400;
+    }
+
+    .date-calendar-day.today {
+      border-color: rgba(36, 93, 132, 0.42);
+    }
+
+    .date-calendar-day.selected {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
     }
 
     .date-error {
@@ -491,10 +565,11 @@
         <div class="field-grid">
           <label>
             תאריך לבדיקה
-            <span class="date-control">
+            <span class="date-control" id="checkDateControl">
               <input id="checkDateText" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" autocomplete="off" />
-              <button class="date-picker-button" id="checkDatePicker" type="button" aria-label="פתח לוח שנה">▦</button>
-              <input id="checkDate" type="date" aria-hidden="true" tabindex="-1" />
+              <button class="date-picker-button" id="checkDatePicker" type="button" aria-label="פתח לוח שנה" aria-haspopup="dialog" aria-expanded="false">▦</button>
+              <input id="checkDate" type="hidden" />
+              <div class="date-calendar" id="checkDateCalendar" role="dialog" aria-label="בחירת תאריך" hidden></div>
             </span>
             <span class="date-error" id="checkDateError"></span>
           </label>
@@ -584,8 +659,10 @@
     const els = {
       todayLabel: document.querySelector("#todayLabel"),
       checkDate: document.querySelector("#checkDate"),
+      checkDateControl: document.querySelector("#checkDateControl"),
       checkDateText: document.querySelector("#checkDateText"),
       checkDatePicker: document.querySelector("#checkDatePicker"),
+      checkDateCalendar: document.querySelector("#checkDateCalendar"),
       checkDateError: document.querySelector("#checkDateError"),
       calculateBtn: document.querySelector("#calculateBtn"),
       todayBtn: document.querySelector("#todayBtn"),
@@ -610,6 +687,8 @@
     });
 
     let exceptions = loadExceptions();
+    let activeDateControl = null;
+    const calendarViewDates = {};
 
     initialize();
 
@@ -1069,14 +1148,8 @@
       const hiddenInput = els[name];
       const textInput = els[`${name}Text`];
       const pickerButton = els[`${name}Picker`];
-
-      hiddenInput.addEventListener("change", () => {
-        const date = parseDate(hiddenInput.value);
-        if (date) {
-          setDateControl(name, date);
-          if (onCommit) onCommit();
-        }
-      });
+      const control = els[`${name}Control`];
+      const calendar = els[`${name}Calendar`];
 
       textInput.addEventListener("input", () => {
         textInput.value = formatDateTyping(textInput.value);
@@ -1097,12 +1170,97 @@
       });
 
       pickerButton.addEventListener("click", () => {
-        if (hiddenInput.showPicker) {
-          hiddenInput.showPicker();
-        } else {
-          hiddenInput.click();
+        const selected = parseDisplayDate(textInput.value) || parseDate(hiddenInput.value) || stripTime(new Date());
+        toggleCalendar(name, selected);
+      });
+
+      calendar.addEventListener("click", event => {
+        const button = event.target.closest("[data-calendar-action], [data-calendar-date]");
+        if (!button) return;
+
+        if (button.dataset.calendarAction === "prev") {
+          shiftCalendarMonth(name, -1);
+          return;
+        }
+
+        if (button.dataset.calendarAction === "next") {
+          shiftCalendarMonth(name, 1);
+          return;
+        }
+
+        if (button.dataset.calendarDate) {
+          const date = parseDate(button.dataset.calendarDate);
+          setDateControl(name, date);
+          closeCalendar(name);
+          if (onCommit) onCommit();
         }
       });
+
+      document.addEventListener("click", event => {
+        if (activeDateControl === name && !control.contains(event.target)) {
+          closeCalendar(name);
+        }
+      });
+    }
+
+    function toggleCalendar(name, selectedDate) {
+      if (activeDateControl === name && !els[`${name}Calendar`].hidden) {
+        closeCalendar(name);
+        return;
+      }
+
+      activeDateControl = name;
+      calendarViewDates[name] = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      renderCalendar(name, selectedDate);
+      els[`${name}Calendar`].hidden = false;
+      els[`${name}Picker`].setAttribute("aria-expanded", "true");
+    }
+
+    function closeCalendar(name) {
+      els[`${name}Calendar`].hidden = true;
+      els[`${name}Picker`].setAttribute("aria-expanded", "false");
+      if (activeDateControl === name) activeDateControl = null;
+    }
+
+    function shiftCalendarMonth(name, amount) {
+      const viewDate = calendarViewDates[name] || stripTime(new Date());
+      calendarViewDates[name] = new Date(viewDate.getFullYear(), viewDate.getMonth() + amount, 1);
+      renderCalendar(name, parseDate(els[name].value) || stripTime(new Date()));
+    }
+
+    function renderCalendar(name, selectedDate) {
+      const calendar = els[`${name}Calendar`];
+      const viewDate = calendarViewDates[name] || new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const today = stripTime(new Date());
+      const firstOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+      const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
+      const monthTitle = firstOfMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+      const weekdayLabels = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+      let daysHtml = "";
+
+      for (let index = 0; index < 42; index += 1) {
+        const date = addDays(gridStart, index);
+        const classes = [
+          "date-calendar-day",
+          date.getMonth() === firstOfMonth.getMonth() ? "" : "outside",
+          sameDate(date, today) ? "today" : "",
+          sameDate(date, selectedDate) ? "selected" : ""
+        ].filter(Boolean).join(" ");
+
+        daysHtml += `<button class="${classes}" type="button" data-calendar-date="${toInputDate(date)}">${date.getDate()}</button>`;
+      }
+
+      calendar.innerHTML = `
+        <div class="date-calendar-header">
+          <button class="date-calendar-nav" type="button" data-calendar-action="next" aria-label="חודש הבא">›</button>
+          <div class="date-calendar-title">${monthTitle}</div>
+          <button class="date-calendar-nav" type="button" data-calendar-action="prev" aria-label="חודש קודם">‹</button>
+        </div>
+        <div class="date-calendar-weekdays">
+          ${weekdayLabels.map(day => `<div class="date-calendar-weekday">${day}</div>`).join("")}
+        </div>
+        <div class="date-calendar-days">${daysHtml}</div>
+      `;
     }
 
     function setDateControl(name, date) {
