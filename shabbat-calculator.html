@@ -187,19 +187,33 @@
 
     .date-calendar-header {
       display: grid;
-      grid-template-columns: 40px minmax(0, 1fr) 40px;
-      gap: 8px;
-      align-items: center;
+      gap: 10px;
       margin-bottom: 10px;
     }
 
-    .date-calendar-title {
-      text-align: center;
-      font-weight: 700;
-      color: var(--ink);
+    .date-calendar-nav-row,
+    .date-calendar-selects {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 8px;
     }
 
-    .date-calendar-nav,
+    .date-calendar-nav {
+      min-height: 38px;
+      padding: 0 8px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .date-calendar-selects select {
+      height: 40px;
+      padding: 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+    }
+
     .date-calendar-day {
       min-height: 38px;
       padding: 0;
@@ -1200,6 +1214,16 @@
         }
       });
 
+      calendar.addEventListener("change", event => {
+        if (!event.target.matches("[data-calendar-select]")) return;
+
+        const currentViewDate = calendarViewDates[name] || stripTime(new Date());
+        const selectedMonth = Number(calendar.querySelector("[data-calendar-select='month']").value);
+        const selectedYear = Number(calendar.querySelector("[data-calendar-select='year']").value);
+        calendarViewDates[name] = new Date(selectedYear, selectedMonth, 1);
+        renderCalendar(name, parseDate(hiddenInput.value) || currentViewDate);
+      });
+
       document.addEventListener("click", event => {
         if (activeDateControl === name && !control.contains(event.target)) {
           closeCalendar(name);
@@ -1238,8 +1262,15 @@
       const today = stripTime(new Date());
       const firstOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
       const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
-      const monthTitle = firstOfMonth.toLocaleDateString("he-IL", { month: "long", year: "numeric" });
       const weekdayLabels = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+      const monthOptions = Array.from({ length: 12 }, (_, monthIndex) => {
+        const monthName = new Date(firstOfMonth.getFullYear(), monthIndex, 1).toLocaleDateString("he-IL", { month: "long" });
+        const selected = monthIndex === firstOfMonth.getMonth() ? "selected" : "";
+        return `<option value="${monthIndex}" ${selected}>${monthName}</option>`;
+      }).join("");
+      const yearOptions = Array.from({ length: 16 }, (_, index) => firstOfMonth.getFullYear() - 5 + index)
+        .map(year => `<option value="${year}" ${year === firstOfMonth.getFullYear() ? "selected" : ""}>${year}</option>`)
+        .join("");
       let daysHtml = "";
 
       for (let index = 0; index < 42; index += 1) {
@@ -1256,9 +1287,14 @@
 
       calendar.innerHTML = `
         <div class="date-calendar-header">
-          <button class="date-calendar-nav" type="button" data-calendar-action="next" aria-label="חודש הבא">›</button>
-          <div class="date-calendar-title">${monthTitle}</div>
-          <button class="date-calendar-nav" type="button" data-calendar-action="prev" aria-label="חודש קודם">‹</button>
+          <div class="date-calendar-nav-row">
+            <button class="date-calendar-nav" type="button" data-calendar-action="next" aria-label="חודש הבא">חודש הבא</button>
+            <button class="date-calendar-nav" type="button" data-calendar-action="prev" aria-label="חודש קודם">חודש קודם</button>
+          </div>
+          <div class="date-calendar-selects">
+            <select data-calendar-select="month" aria-label="בחירת חודש">${monthOptions}</select>
+            <select data-calendar-select="year" aria-label="בחירת שנה">${yearOptions}</select>
+          </div>
         </div>
         <div class="date-calendar-weekdays">
           ${weekdayLabels.map(day => `<div class="date-calendar-weekday">${day}</div>`).join("")}
